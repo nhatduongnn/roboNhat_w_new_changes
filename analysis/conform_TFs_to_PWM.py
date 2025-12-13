@@ -3,9 +3,9 @@ import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
 import sys
-sys.path.insert(0, '/home/rapiduser/programs/RoboCOP/pkg/')
+from collections import defaultdict
+sys.path.insert(0, '/usr/xtmp/nd141/programs/roboNhat_w_new_changes/pkg')
 import robocop.utils.parameterize as parameterize
-
 
 import re
 
@@ -81,102 +81,112 @@ def convert_chromosome(chrom: str, target_format: str) -> str:
     else:
         raise ValueError(f"Unknown target format: {target_format}")
 
-
 def score_sequence_with_pwm(seq, pwm):
-    """Score a sequence (string) against a PWM matrix.
-       PWM shape: (4, L), rows = A,C,G,T
-    """
-    base_to_idx = {"A":0, "C":1, "G":2, "T":3}
+    """Score a sequence (string) against a PWM matrix (4 x L)."""
+    base_to_idx = {"A": 0, "C": 1, "G": 2, "T": 3}
     score = 0.0
     for i, base in enumerate(seq.upper()):
         if base in base_to_idx:
             score += pwm[base_to_idx[base], i]
         else:
-            score += pwm[4, i]  # if 'N' column exists
+            score += pwm[4, i] if pwm.shape[0] > 4 else 0  # handle N if exists
     return score
 
 def best_match_for_tf(row, motifDict, genome_fasta):
     """Find best matching window for TF row in BED."""
     chrom, start, end, tf = row["chr"], row["start"], row["end"], row["TF"]
-
     chrom = convert_chromosome(chrom, "chrRoman")
+    
+    # Build TF -> [motif_names] mapping
+    translate_motif_name = defaultdict(list)
+    for name in motifDict.keys():
+        tf_key = name.split('_', 1)[0].lower()
+        translate_motif_name[tf_key].append(name)
 
-    translate_motif_name = {name.split('_', 1)[0].lower(): name for name in motifDict.keys()}
-    # midpoint
     midpoint = (start + end) // 2
-    if tf in translate_motif_name.keys():
+    tf_lower = tf.lower()
 
-        pwm = motifDict[translate_motif_name[tf]][:4]   # take A,C,G,T rows only
-        L = pwm.shape[1]
+    if tf_lower in translate_motif_name:
+        best_overall = None
+        for motif_name in translate_motif_name[tf_lower]:
+            pwm = motifDict[motif_name][:4]
+            L = pwm.shape[1]
 
-        # define search region
-        search_start = max(0, midpoint - L)
-        search_end = midpoint + L
+            # define search region
+            search_start = max(0, midpoint - L)
+            search_end = midpoint + L
 
-        # extract sequence
-        seq_record = genome_fasta[chrom]
-        search_seq = str(seq_record.seq[search_start:search_end])
+            seq_record = genome_fasta[chrom]
+            search_seq = str(seq_record.seq[search_start:search_end])
 
-        best_score = -np.inf
-        best_pos, best_strand, best_seq = None, None, None
+            best_score = -np.inf
+            best_pos, best_strand, best_seq = None, None, None
 
-        # sliding window
-        for i in range(0, len(search_seq) - L + 1):
-            window_seq = search_seq[i:i+L]
+            # sliding window scan
+            for i in range(0, len(search_seq) - L + 1):
+                window_seq = search_seq[i:i+L]
 
-            # Watson strand
-            score_w = score_sequence_with_pwm(window_seq, pwm)
-            if score_w > best_score:
-                best_score = score_w
-                best_pos = search_start + i
-                best_strand = "+"
-                best_seq = window_seq
+                # forward
+                score_w = score_sequence_with_pwm(window_seq, pwm)
+                if score_w > best_score:
+                    best_score = score_w
+                    best_pos = search_start + i
+                    best_strand = "+"
+                    best_seq = window_seq
 
-            # Crick strand (reverse complement)
-            rc_seq = str(Seq(window_seq).reverse_complement())
-            score_c = score_sequence_with_pwm(rc_seq, pwm)
-            if score_c > best_score:
-                best_score = score_c
-                best_pos = search_start + i
-                best_strand = "-"
-                best_seq = rc_seq
+                # reverse complement
+                rc_seq = str(Seq(window_seq).reverse_complement())
+                score_c = score_sequence_with_pwm(rc_seq, pwm)
+                if score_c > best_score:
+                    best_score = score_c
+                    best_pos = search_start + i
+                    best_strand = "-"
+                    best_seq = rc_seq
 
-        return {
-            "chr": chrom,
-            "start": best_pos,
-            "end": best_pos + L,
-            "strand": best_strand,
-            "agree": 1 if best_strand == row['strand'] else 0,
-            "TF": tf,
-            "score": best_score,
-            "best_seq": best_seq,
-            "peakVal" : row['peakVal']
-        }
+            result = {
+                "chr": chrom,
+                "start": best_pos,
+                "end": best_pos + L,
+                "strand": best_strand,
+                "agree": 1 if best_strand == row["strand"] else 0,
+                "TF": motif_name,
+                "score": best_score,
+                "best_seq": best_seq,
+                "peakVal": row.get("peakVal", None)
+            }
 
-# Example driver
+            if best_overall is None or result["score"] > best_overall["score"]:
+                best_overall = result
+
+        return best_overall
+    else:
+        return None
+
 def scan_bed_with_pwms(bed_file, pwm_file, genome_fasta_file):
+    print('okay!!!!!')
     # load motifs
     motifDict = parameterize.getMotifsMEME(pwm_file)
-
-    # load genome fasta into dict
+    # load genome fasta
     genome_fasta = SeqIO.to_dict(SeqIO.parse(genome_fasta_file, "fasta"))
-
     # load bed
     bed_df = pd.read_csv(bed_file, sep="\t")
-
     results = []
     for _, row in bed_df.iterrows():
         res = best_match_for_tf(row, motifDict, genome_fasta)
-        if res is not None:   # only keep successful results
+        if res is not None:
             results.append(res)
-
     return pd.DataFrame(results)
 
 
+# ---- Example driver ----
+bob = scan_bed_with_pwms(
+    '/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/rossi_peak_w_strand_all_TFs.bed',
+    '/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/motifs_meme.txt',
+    '/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/SacCer3.fa'
+)
 
-bob = scan_bed_with_pwms('/home/rapiduser/programs/RoboCOP/analysis/inputs/rossi_peak_w_strand_all_TFs.bed',\
-                         '/home/rapiduser/programs/RoboCOP/analysis/inputs/motifs_meme.txt',\
-                         '/home/rapiduser/programs/RoboCOP/analysis/inputs/SacCer3.fa'
-                         )
-
-bob.to_csv('/home/rapiduser/programs/RoboCOP/analysis/inputs/rossi_peak_w_strand_conformed_to_PWM_all_TFs_peakVal.bed', sep='\t', index=False)
+bob.to_csv(
+    '/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/rossi_peak_w_strand_conformed_to_PWM_all_TFs_peakVal.bed',
+    sep='\t',
+    index=False
+)
