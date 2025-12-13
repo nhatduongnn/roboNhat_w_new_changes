@@ -137,42 +137,57 @@ def plotRegion(gtffile, chrm, start, end, ax):
     ax.set_yticks([])
     ax.axis('off')
 
-def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end, tech, longCounts, shortCounts, save = True, gtffile = None):
-
-    
+def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end,
+               tech, longCounts, shortCounts, save=True, gtffile=None,
+               fiber_info=None):
     fragRangeLong = tuple([int(x) for x in re.findall(r'\d+', config.get("main", "fragRangeLong"))])
     fragRangeShort = tuple([int(x) for x in re.findall(r'\d+', config.get("main", "fragRangeShort"))])
-    
+
     offset = 4 if tech == "ATAC" else 0
+
     if gtffile is not None:
-        fig, ax = plt.subplots(4, 1, figsize = (19, 8), gridspec_kw = {'height_ratios': [0.3, 1, 0.5, 1]})
+        fig, ax = plt.subplots(4, 1, figsize=(19, 8), gridspec_kw={'height_ratios': [0.3, 1, 0.5, 1]})
         isgtf = 1
     else:
-        fig, ax = plt.subplots(3, 1, figsize = (19, 7))
+        fig, ax = plt.subplots(3, 1, figsize=(19, 7))
         isgtf = 0
 
-    ax[1 + isgtf].plot(list(range(start - 1, end)), longCounts, color = 'maroon')
-    ax[1 + isgtf].plot(list(range(start - 1, end)), shortCounts, color = 'blue')
-    
+    # MNase coverage plot
+    ax[1 + isgtf].plot(list(range(start - 1, end)), longCounts, color='maroon')
+    ax[1 + isgtf].plot(list(range(start - 1, end)), shortCounts, color='blue')
+
     bamFile = config.get("main", "bamFile")
-    shortCounts, longCounts = plotMidpointsAx(ax[0 + isgtf], bamFile, chrm, start, end, fragRangeShort, fragRangeLong, offset = offset)
-    # plot RoboCOP output
-    visualization.plot_occupancy_profile(ax[2 + isgtf], op = optable, chromo = chrm, coordinate_start = start, threshold = 0.1, dbf_color_map = dbf_color_map)
-    ax[0 + isgtf].set_xlim((start, end))
-    ax[1 + isgtf].set_xlim((start, end))
-    ax[2 + isgtf].set_xlim((start, end))
-    ax[0 + isgtf].set_xticks([])
-    ax[1 + isgtf].set_xticks([])
+    shortCounts, longCounts = plotMidpointsAx(
+        ax[0 + isgtf], bamFile, chrm, start, end,
+        fragRangeShort, fragRangeLong, offset=offset
+    )
+
+    # NEW: plot Fiber-seq data if provided
+    if fiber_info is not None:
+        plotFiberseqAx(ax[1 + isgtf], fiber_info, start, end)
+
+    # RoboCOP occupancy
+    visualization.plot_occupancy_profile(
+        ax[2 + isgtf], op=optable, chromo=chrm,
+        coordinate_start=start, threshold=0.1,
+        dbf_color_map=dbf_color_map
+    )
+
+    # Axis formatting
+    for j in range(3 + isgtf):
+        ax[j].set_xlim((start, end))
+        ax[j].set_xticks([])
+
     ax[2 + isgtf].set_xlabel(chrm)
 
-    if isgtf: plotRegion(gtffile, chrm, start, end, ax[0])
-
-    ax[1 + isgtf].set_visible(False)
+    if isgtf:
+        plotRegion(gtffile, chrm, start, end, ax[0])
 
     if save:
-        os.makedirs(outDir + 'figures/', exist_ok = True)
-        plt.savefig(outDir + "figures/robocop_output_" + chrm + "_" + str(start) + "_" + str(end) + ".png")
-        print("Output saved:", outDir + "figures/robocop_output_" + chrm + "_" + str(start) + "_" + str(end) + ".png")
+        os.makedirs(outDir + 'figures/', exist_ok=True)
+        outfile = f"{outDir}figures/robocop_output_{chrm}_{start}_{end}.png"
+        plt.savefig(outfile)
+        print("Output saved:", outfile)
     else:
         plt.show()
 
@@ -200,8 +215,105 @@ def plot_output(outDir, chrm, start, end, save = True):
     allinfofiles = glob.glob(outDir + 'tmpDir/info*.h5')
 
     optable, longCounts, shortCounts = calc_posterior(allinfofiles, dshared, coords, chrm, start, end)
-    dbf_color_map = colorMap(outDir) # pickle.load(open("dbf_color_map.pkl", "rb"))
-    plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end, tech, longCounts, shortCounts, save, gtffile = gtfFile)
+    #Fiber-seq: if directory exists and has info files, load it
+    fiber_dir = os.path.join(outDir, "fiberseq")
+    if os.path.isdir(fiber_dir):
+        allfiberfiles = glob.glob(os.path.join(fiber_dir, "info*.h5"))
+    else:
+        allfiberfiles = []
+    fiber_info = None
+    if allfiberfiles:
+        fiber_info = plot_fiberseq(allfiberfiles, coords, chrm, start, end, tech="fiberseq")
+
+    dbf_color_map = colorMap(outDir)
+    plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end, tech,
+               longCounts, shortCounts, save, gtffile=gtfFile,
+               fiber_info=fiber_info)  # << pass in fiberseq
+
+def plot_fiberseq(allinfofiles, coords, chrm, start, end, tech):
+    """
+    Load Fiber-seq count arrays (Watson/Crick meth/A) from info files.
+
+    Arguments:
+        allinfofiles : list of info_*.h5 files
+        coords : pd.DataFrame with segment coordinates
+        chrm, start, end : region to plot
+        tech : name of assay, e.g. 'fiberseq'
+
+    Returns:
+        dict[str, np.ndarray] with keys:
+        ['count_meth_watson', 'count_meth_crick',
+         'count_A_watson', 'count_A_crick']
+    """
+    idxs = get_idx(chrm, start, end, coords)
+
+    # Initialize arrays for region length
+    region_len = end - start + 1
+    result = {
+        'count_meth_watson': np.zeros(region_len),
+        'count_meth_crick': np.zeros(region_len),
+        'count_A_watson': np.zeros(region_len),
+        'count_A_crick': np.zeros(region_len),
+        'count': np.zeros(region_len)  # keep track how many segments contributed
+    }
+
+    # iterate through all info files and all segments that overlap region
+    for infofile in allinfofiles:
+        for idx in idxs:
+            f = h5py.File(infofile, mode='r')
+            k = f'segment_{idx}'
+            # skip if the segment key is not in file (like calc_posterior)
+            if k not in f.keys():
+                f.close()
+                continue
+
+            try:
+                cmw = get_sparse_todense(f, f"{k}/{tech}_count_meth_watson")
+                cmc = get_sparse_todense(f, f"{k}/{tech}_count_meth_crick")
+                caw = get_sparse_todense(f, f"{k}/{tech}_count_A_watson")
+                cac = get_sparse_todense(f, f"{k}/{tech}_count_A_crick")
+            except Exception as e:
+                print(f"Warning: could not load Fiber-seq datasets from {infofile}, {k}: {e}")
+                f.close()
+                continue
+            f.close()
+
+            seg_start = coords.loc[idx]['start']
+            seg_end = coords.loc[idx]['end']
+
+            dp_start = max(0, start - seg_start)
+            dp_end = min(end - seg_start + 1, seg_end - seg_start + 1)
+            p_start = max(0, seg_start - start)
+            p_end = p_start + dp_end - dp_start
+
+            result['count_meth_watson'][p_start:p_end] += cmw[dp_start:dp_end]
+            result['count_meth_crick'][p_start:p_end] += cmc[dp_start:dp_end]
+            result['count_A_watson'][p_start:p_end] += caw[dp_start:dp_end]
+            result['count_A_crick'][p_start:p_end] += cac[dp_start:dp_end]
+            result['count'][p_start:p_end] += 1
+
+    # Average over contributing segments
+    for key in ['count_meth_watson', 'count_meth_crick', 'count_A_watson', 'count_A_crick']:
+        mask = result['count'] > 0
+        result[key][mask] /= result['count'][mask]
+
+    # Remove count tracking from result before returning
+    del result['count']
+    return result
+
+def plotFiberseqAx(ax, fiber_info, start, end):
+    """
+    Plot Fiber-seq counts for watson/crick and methyl/A.
+    """
+    x = np.arange(start, end + 1)
+    ax.plot(x, fiber_info['count_meth_watson'], color='darkgreen', label='meth_W')
+    ax.plot(x, fiber_info['count_meth_crick'], color='limegreen', label='meth_C')
+    ax.plot(x, fiber_info['count_A_watson'], color='purple', label='A_W')
+    ax.plot(x, fiber_info['count_A_crick'], color='violet', label='A_C')
+    ax.set_xlim(start, end)
+    ax.set_ylabel('Fiber‑seq counts')
+    ax.legend(loc='upper right', frameon=False)
+
     
 if __name__ == '__main__':
 

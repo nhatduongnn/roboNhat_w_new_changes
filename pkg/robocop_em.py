@@ -100,7 +100,7 @@ def runROBOCOP_EM(coordFile, config, outDir, tmpDir, info_file_name, mnaseFile, 
     likelihood = getLogLikelihood(segments, dshared)
     fLike.write(str(likelihood) + '\n')
     fLike.close()
-    iterations = 10
+    iterations = 0
     countMNase = 0
 
     print("Writing MNase params")

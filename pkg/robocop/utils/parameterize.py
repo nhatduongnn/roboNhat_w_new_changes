@@ -80,6 +80,7 @@ def getDBFconc(nucFile, pwmFile, outDir):
     dbf_conc = [(k, calculateKD(pwm, k)) for k in list(pwm.keys())]
     dbf_conc = dict(dbf_conc)
     dbf_conc['background'] = 1.0
+    dbf_conc['unknown'] = 0.1
     dbf_conc['nucleosome'] = 35
     
     # convert concentration to probability

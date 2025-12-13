@@ -927,6 +927,47 @@ def posterior_forward_backward_loop(d, dshared, segment):
         ftable, btable, bscaling_factors,
         scaling_factors, dshared['n_states'], n_obs, 
         p_table)
+
+    # import matplotlib.pyplot as plt
+    # import os
+    # import sys   # <-- import sys to exit later
+
+    # save_dir = os.path.join(dshared["tmpDir"], "emission_plots")
+    # os.makedirs(save_dir, exist_ok=True)
+
+    # for layer in range(data_emission_mat.shape[0]):
+    #     layer_data = data_emission_mat[layer].ravel()
+    #     finite_vals = layer_data[np.isfinite(layer_data)]
+    #     if finite_vals.size == 0:
+    #         print(f"Layer {layer}: no finite values, skipping")
+    #         continue
+
+    #     # Compute summary stats
+    #     vmin = finite_vals.min()
+    #     vmax = finite_vals.max()
+    #     vmedian = np.median(finite_vals)
+
+    #     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    #     # --- Histogram ---
+    #     axes[0].hist(finite_vals, bins=100, color='steelblue', alpha=0.7, label=f"min={vmin:.3e}")
+    #     axes[0].set_title(f"Histogram – layer {layer}")
+    #     axes[0].set_xlabel("Emission value")
+    #     axes[0].set_ylabel("Frequency")
+    #     axes[0].set_yscale("log")
+    #     axes[0].legend()
+
+    #     # --- Box plot ---
+    #     axes[1].boxplot(finite_vals, vert=True)
+    #     axes[1].set_title(f"Layer {layer} | min={vmin:.3e}, median={vmedian:.3e}, max={vmax:.3e}")
+
+    #     plt.tight_layout()
+    #     plt.savefig(os.path.join(save_dir, f"emission_layer_{layer}.png"), dpi=150)
+    #     plt.close(fig)
+
+    # # Stop program after plotting
+    # sys.exit("Stopping after plotting emission layers.")
+
     # After posterior_decoding, data_emission_mat is a NumPy array
     # shape: (7, n_obs, n_states)
     save_dir = os.path.join(dshared["tmpDir"], "emission_plots")
