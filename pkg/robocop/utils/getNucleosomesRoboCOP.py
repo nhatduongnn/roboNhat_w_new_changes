@@ -10,7 +10,8 @@ import os
 import glob
 import h5py
 from Bio import SeqIO
-from configparser import SafeConfigParser
+# from configparser import SafeConfigParser
+from configparser import ConfigParser
 
 # combine overlapping segments
 def getNonoverlappingSegments(coords):
@@ -195,7 +196,7 @@ if __name__ == '__main__':
     dirname = (sys.argv)[1]
     configFile = dirname + "/config.ini"
 
-    config = SafeConfigParser()
+    config = ConfigParser() # SafeConfigParser()
     config.read(configFile)
     
     # get size of each chromosome

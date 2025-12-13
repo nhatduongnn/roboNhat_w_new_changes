@@ -10,7 +10,8 @@ import h5py
 import os
 import glob
 from Bio import SeqIO
-from configparser import SafeConfigParser
+# from configparser import SafeConfigParser
+from configparser import ConfigParser
 
 # combine overlapping segments
 def getNonoverlappingSegments(coords):
@@ -29,10 +30,10 @@ def getNonoverlappingSegments(coords):
             elif send + 1 <= r['end'] and send + 1 >= r['start']:
                 send = r['end']
             else:
-                segments = segments.append({'chr': chrm, 'start': sstart, 'end': send}, ignore_index = True)
+                segments = segments._append({'chr': chrm, 'start': sstart, 'end': send}, ignore_index = True)
                 sstart = r['start']
                 send = r['end']
-        segments = segments.append({'chr': chrm, 'start': sstart, 'end': send}, ignore_index = True)
+        segments = segments._append({'chr': chrm, 'start': sstart, 'end': send}, ignore_index = True)
     return segments
 
 def getScores(coords, dirname, hmmconfig, tf, r):
@@ -181,7 +182,7 @@ def getTFPosMod(dirname, chrSizes, tfs, hmmconfig):
                 tfscoreKeep[(segstart + segend)//2] = tfsc
                 
             tfchr['score'] = tfscoreKeep
-            df = df.append(tfchr, ignore_index = True)
+            df = df._append(tfchr, ignore_index = True)
 
         df = df.sort_values(by = "score", ascending = False)
         df.to_hdf(dirname + "/RoboCOP_outputs/" + tf + ".h5", key = "df", mode = "w")
@@ -206,7 +207,7 @@ def getTFPos(dirname, chrSizes, tfs, hmmconfig):
                 i = np.argmax(tfchr["score"])
                 if tfchr.iloc[i]["score"] < 1e-100: break
                 print("Score:", tfchr.iloc[i]["score"])
-                df = df.append(tfchr.iloc[i], ignore_index = True)
+                df = df._append(tfchr.iloc[i], ignore_index = True)
                 # make that region 0
                 mstart = tfchr.iloc[i]['start']
                 mend = tfchr.iloc[i]['end']
@@ -226,7 +227,8 @@ if __name__ == '__main__':
     dirname = (sys.argv)[1]
     configFile = dirname + "/config.ini"
 
-    config = SafeConfigParser()
+    # config = SafeConfigParser()
+    config = ConfigParser()
     config.read(configFile)
     
     # get size of each chromosome
