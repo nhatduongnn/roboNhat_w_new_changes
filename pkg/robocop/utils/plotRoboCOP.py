@@ -146,10 +146,13 @@ def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end,
     offset = 4 if tech == "ATAC" else 0
 
     if gtffile is not None:
-        fig, ax = plt.subplots(4, 1, figsize=(19, 8), gridspec_kw={'height_ratios': [0.3, 1, 0.5, 1]})
+        nrows = 6 if fiber_info is not None else 4
+        ratios = [0.3, 1, 0.5, 1, 0.25, 0.25] if fiber_info else [0.3, 1, 0.5, 1]
+        fig, ax = plt.subplots(nrows, 1, figsize=(19, 10), gridspec_kw={'height_ratios': ratios})
         isgtf = 1
     else:
-        fig, ax = plt.subplots(3, 1, figsize=(19, 7))
+        nrows = 5 if fiber_info is not None else 3
+        fig, ax = plt.subplots(nrows, 1, figsize=(19, 9))
         isgtf = 0
 
     # MNase coverage plot
@@ -164,7 +167,7 @@ def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end,
 
     # NEW: plot Fiber-seq data if provided
     if fiber_info is not None:
-        plotFiberseqAx(ax[1 + isgtf], fiber_info, start, end)
+        plotFiberseqAx(ax[3 + isgtf], ax[4 + isgtf], fiber_info, start, end)
 
     # RoboCOP occupancy
     visualization.plot_occupancy_profile(
@@ -194,9 +197,16 @@ def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end,
 def plot_output(outDir, chrm, start, end, save = True):
     outDir = outDir + '/' if outDir[-1] != '/' else outDir
 
-    configFile = outDir + "/config.ini"
+    configFile = outDir + "config.ini"
+    # DEBUG: show exactly where we’re looking
+    print("Current working directory:", os.getcwd())
+    print("Absolute path to configFile:", os.path.abspath(configFile))
+    print("Does it exist?:", os.path.exists(configFile))
+
     config = configparser.SafeConfigParser()
     config.read(configFile)
+    print("configFile (as read):", configFile)
+    print("Sections found:", config.sections())
     
     # hmmconfigfile is generated only with robocop_em.py
     # if outputDir is generated using robocop_no_em.py
@@ -215,15 +225,9 @@ def plot_output(outDir, chrm, start, end, save = True):
     allinfofiles = glob.glob(outDir + 'tmpDir/info*.h5')
 
     optable, longCounts, shortCounts = calc_posterior(allinfofiles, dshared, coords, chrm, start, end)
-    #Fiber-seq: if directory exists and has info files, load it
-    fiber_dir = os.path.join(outDir, "fiberseq")
-    if os.path.isdir(fiber_dir):
-        allfiberfiles = glob.glob(os.path.join(fiber_dir, "info*.h5"))
-    else:
-        allfiberfiles = []
-    fiber_info = None
-    if allfiberfiles:
-        fiber_info = plot_fiberseq(allfiberfiles, coords, chrm, start, end, tech="fiberseq")
+
+    #Need to implement a check to see if fiberseq file is there, then run this next code
+    fiber_info = plot_fiberseq(allinfofiles, coords, chrm, start, end, tech="Fiber")
 
     dbf_color_map = colorMap(outDir)
     plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end, tech,
@@ -261,6 +265,8 @@ def plot_fiberseq(allinfofiles, coords, chrm, start, end, tech):
     for infofile in allinfofiles:
         for idx in idxs:
             f = h5py.File(infofile, mode='r')
+            print(f"\nContents of {infofile}:")
+            f.visit(print)
             k = f'segment_{idx}'
             # skip if the segment key is not in file (like calc_posterior)
             if k not in f.keys():
@@ -268,12 +274,20 @@ def plot_fiberseq(allinfofiles, coords, chrm, start, end, tech):
                 continue
 
             try:
+                #print(f"{k}/{tech}_count_meth_watson")
+                
                 cmw = get_sparse_todense(f, f"{k}/{tech}_count_meth_watson")
                 cmc = get_sparse_todense(f, f"{k}/{tech}_count_meth_crick")
                 caw = get_sparse_todense(f, f"{k}/{tech}_count_A_watson")
                 cac = get_sparse_todense(f, f"{k}/{tech}_count_A_crick")
+                print('we hereeeee')
+                print(cmw)
+                print(cmc)
+                print(caw)
+                print(cac)
             except Exception as e:
                 print(f"Warning: could not load Fiber-seq datasets from {infofile}, {k}: {e}")
+                print('bob')
                 f.close()
                 continue
             f.close()
@@ -301,18 +315,40 @@ def plot_fiberseq(allinfofiles, coords, chrm, start, end, tech):
     del result['count']
     return result
 
-def plotFiberseqAx(ax, fiber_info, start, end):
+def plotFiberseqAx(ax_w, ax_c, fiber_info, start, end):
     """
-    Plot Fiber-seq counts for watson/crick and methyl/A.
+    Plot Fiber‑seq methyl/A ratios for Watson and Crick strands
+    into two separate axes.
+
+    Parameters
+    ----------
+    ax_w, ax_c : matplotlib Axes
+        Axes for Watson and Crick strand ratio plots.
+    fiber_info : dict
+        Output of plot_fiberseq() with count arrays.
+    start, end : int
+        Genomic interval (inclusive start, exclusive end).
     """
     x = np.arange(start, end + 1)
-    ax.plot(x, fiber_info['count_meth_watson'], color='darkgreen', label='meth_W')
-    ax.plot(x, fiber_info['count_meth_crick'], color='limegreen', label='meth_C')
-    ax.plot(x, fiber_info['count_A_watson'], color='purple', label='A_W')
-    ax.plot(x, fiber_info['count_A_crick'], color='violet', label='A_C')
-    ax.set_xlim(start, end)
-    ax.set_ylabel('Fiber‑seq counts')
-    ax.legend(loc='upper right', frameon=False)
+
+    # Compute ratios safely (avoid divide-by-zero)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        ratio_w = np.where(fiber_info["count_A_watson"] > 0,
+                           fiber_info["count_meth_watson"] / fiber_info["count_A_watson"],
+                           np.nan)
+        ratio_c = np.where(fiber_info["count_A_crick"] > 0,
+                           fiber_info["count_meth_crick"] / fiber_info["count_A_crick"],
+                           np.nan)
+
+    ax_w.scatter(x, ratio_w, s=1 ,color="blue", alpha=0.7, label="Watson meth/A")
+    ax_c.scatter(x, ratio_c, s=1, color="orange", alpha=0.7, label="Crick meth/A")
+
+    for ax, title in zip([ax_w, ax_c], ["Watson strand", "Crick strand"]):
+        ax.set_xlim(start, end)
+        ax.set_ylim(0, 1)        # ratio is 0–1
+        ax.set_ylabel("meth/A ratio")
+        ax.legend(loc="upper right", frameon=False)
+        ax.set_title(title)
 
     
 if __name__ == '__main__':

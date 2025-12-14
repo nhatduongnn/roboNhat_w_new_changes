@@ -1,4 +1,4 @@
-def getFiber_seq(modkit_df, tmpDir, info_file, coords, nucleotide, idx = None, tech = "Fiber_seq"):
+def getFiber_seq(modkit_df, tmpDir, info_file, coords, nucleotide, idx = None, tech = "Fiber"):
     fiber_seq_data_count_meth_watson = ""
     fiber_seq_data_count_meth_crick = ""
 
@@ -44,7 +44,7 @@ def getFiber_seq(modkit_df, tmpDir, info_file, coords, nucleotide, idx = None, t
 
     return fiber_seq_data_count_meth_watson, fiber_seq_data_count_meth_crick
 
-def getValuesFiber_seqOneFileNucleotide(modkit_df, chrm, minStart, maxEnd, nucleotide):
+def getValuesFiber_seqOneFileNucleotide(modified_bases_df, chrm, minStart, maxEnd, nucleotide):
 
     minStart = minStart-1 #Convert to 0-based
 
@@ -86,7 +86,7 @@ info_file = h5py.File('./robocop_train/tmpDir/info.h5', mode = 'w')
 tmpDir = './robocop_train/tmpDir/'
 coords = pd.read_csv('./coord_train.tsv', sep = "\t")
 nucleotide = 'A'
-tech= "Fiber_seq"
+tech= "Fiber"
 modkitFile = '/home/rapiduser/projects/Fiber_seq/03202025_barcode01_sup_model_sorted_pileup_all_chr'
 
 # Load Modkit file only once outside loop

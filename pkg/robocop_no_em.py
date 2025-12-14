@@ -36,6 +36,17 @@ def runROBOCOP_NO_EM(coords, config, outDir, tmpDir, info_file_name, trainOutDir
     tech = config.get("main", "tech")
     cshared = config.get("main", "cshared")
 
+    tech2 = config.get("main", "tech2")
+    if tech2 == 'Fiber':
+        modkitFile = config.get("main", "pileupFile")
+        nucleotide = config.get("main", "nucleotide")
+        # Load Modkit file only once outside loop
+        modified_bases_df = pandas.read_csv(modkitFile, sep='\t', header=None)
+        # Split the 9th column into multiple columns (if following previous code pattern)
+        split_columns = modified_bases_df[9].str.split(' ', expand=True)
+        split_columns.columns = [i for i in range(9,9+split_columns.shape[1])]
+        modified_bases_df = pandas.concat([modified_bases_df.drop(columns=[9]), split_columns], axis=1)
+
     # get info from learned model
     cfg = pickle.load(open(trainOutDir + "/HMMconfig.pkl", "rb"), encoding = 'latin1')
     j = 0
@@ -51,6 +62,8 @@ def runROBOCOP_NO_EM(coords, config, outDir, tmpDir, info_file_name, trainOutDir
     nucleotide_sequence = getReads.getNucSequence(nucFile, tmpDir, info_file, coords)
     # read MNase-seq midpoint counts of long and short fragments
     mnase_data_long, mnase_data_short = getReads.getMNase(mnaseFiles, tmpDir, info_file, coords, fragRange, tech = tech)
+    fiber_seq_data_count_meth_watson, fiber_seq_data_count_meth_crick = getReads.getFiber_seq(modified_bases_df, tmpDir, info_file, coords, nucleotide, tech = tech2)
+
 
     # make t copies of each tf_prob for every timepoint -- 1 timepoint
     timepoints = 1
