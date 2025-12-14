@@ -43,7 +43,7 @@ def compute_Fiber_seq_TFPhisMus(
         samfile = pysam.AlignmentFile(bamFile, "rb")
 
     fasta_file = {}
-    for seq_record in SeqIO.parse("/home/rapiduser/programs/RoboCOP/analysis/inputs/SacCer3.fa", "fasta"):
+    for seq_record in SeqIO.parse("/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/SacCer3.fa", "fasta"):
         fasta_file[seq_record.id] = seq_record.seq
 
     tfs = pd.read_csv(csvFile, sep='\t')
@@ -122,6 +122,13 @@ def compute_Fiber_seq_TFPhisMus(
                     modified_bases_df, tfs, tf_name, '-', fasta_file, offset, successes_col=successes_col, trials_col=trials_col
                 )
                 combined_counts = combine_motif_counts_binom(watson_counts, crick_counts)
+
+                ## Plot the distribution of successes and trials for each TF
+                plot_binomial_boxplots(combined_counts, tf_name)
+
+                ## Add pseudo count
+                combined_counts = add_pseudocounts_binomial(combined_counts, 3, 58)
+
                 if combined_counts['num_sites'] == 0:
                     params = create_default_params_binomial()
                 else:
@@ -149,6 +156,13 @@ def compute_Fiber_seq_TFPhisMus(
                 samfile, tfs, combined_tfs, '-', fasta_file, fitdist, offset
             )
             combined_counts = combine_motif_counts(watson_counts, crick_counts)
+
+            ## Plot the distribution of successes and trials for each TF
+            plot_binomial_boxplots(combined_counts, tf_name)
+
+            ## Add pseudo count
+            combined_counts = add_pseudocounts_binomial(combined_counts, 3, 58)
+
             if combined_counts['num_sites'] == 0:
                 params = create_default_params_individual()
             else:
@@ -1018,6 +1032,41 @@ def compute_Fiber_seq_nucleosome(
         return fit_nb_parameters(combined_counts, nuc_len, num_sites, fitdist)
 
 
+def add_pseudocounts_binomial(combined_counts, success_pc=3, trial_pc=58):
+    base_names = ['A','C','G','T']
+    for strand in ['watson_signal','crick_signal']:
+        for b in base_names:
+            succ_arr = combined_counts[strand]['successes'][b]
+            tri_arr  = combined_counts[strand]['trials'][b]
+            tf_len   = succ_arr.shape[1]
+            pseudo_succ = np.full((1, tf_len), success_pc, dtype=int)
+            pseudo_tri  = np.full((1, tf_len), trial_pc, dtype=int)
+            combined_counts[strand]['successes'][b] = np.vstack([succ_arr, pseudo_succ])
+            combined_counts[strand]['trials'][b]    = np.vstack([tri_arr,  pseudo_tri])
+    combined_counts['num_sites'] += 1
+    return combined_counts
+
+def plot_binomial_boxplots(combined_counts, tf_name):
+    """
+    For each base, make boxplots of successes and trials distributions
+    across sites for each position (columns).
+    """
+    base_names = ["A","C","G","T"]
+    for strand in ["watson_signal","crick_signal"]:
+        for signal_type in ["successes","trials"]:
+            fig, ax = plt.subplots(1,1, figsize=(10,4))
+            for b_idx, b in enumerate(base_names):
+                arr = combined_counts[strand][signal_type][b]  # shape: (num_sites, tf_len)
+                if arr.size == 0:
+                    continue
+                ax.boxplot(arr, positions=np.arange(arr.shape[1]) + b_idx*0.15,
+                           widths=0.1, patch_artist=True,
+                           boxprops=dict(facecolor=['red','blue','green','orange'][b_idx]))
+            ax.set_title(f"{tf_name} - {strand} - {signal_type} boxplots")
+            ax.set_xlabel("Motif Position")
+            ax.set_ylabel("Counts")
+            plt.tight_layout()
+            plt.show()
 
 # segments = computeLinkers("/home/rapiduser/programs/RoboCOP/analysis/inputs/Chereji_2018_+1_-1_nucs.bed")
 # segments = pd.DataFrame(segments)
@@ -1071,9 +1120,9 @@ def compute_Fiber_seq_nucleosome(
 
 a = compute_Fiber_seq_TFPhisMus("Fiber_seq",\
                           "/home/rapiduser/projects/DMS-seq/DM1664/DM1664_trim_3prime_18bp_remaining_name_change_sorted.bam",\
-                          "/home/rapiduser/projects/Fiber_seq/03202025_barcode01_sup_model_sorted_pileup_all_chr",\
-                          "/home/rapiduser/programs/RoboCOP/analysis/inputs/rossi_peak_w_strand_conformed_to_PWM_abf1_reb1_atf2_azf1_1000_peakVal.bed",\
-                            "/home/rapiduser/programs/RoboCOP/analysis/robocop_train/tmpDir",\
+                          "/usr/xtmp/nd141/projects/Fiber_seq/process_nanopore_sequencing/combine_sequencing_runs/merged_Mar20_barcode01_Jun25_barcode21-24_May07_barcode03-04_sup_model_sorted_pileup_all_chr",\
+                          "/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/inputs/rossi_peak_w_strand_conformed_to_PWM_all_TFs_peakVal_1000.bed",\
+                            "/usr/xtmp/nd141/programs/roboNhat_w_new_changes/analysis/robocop_train/tmpDir",\
                             (0, 80),\
                                 None,\
                                     0,\
@@ -1086,5 +1135,5 @@ abf1_reb1_params = a
 # To load the dictionary later, you can use:
 
 # Save the dictionary to a file
-with open('inputs/abf1_reb1_params.pkl', 'wb') as f:
+with open('inputs/all_TFs_1000pealVal_params.pkl', 'wb') as f:
     pickle.dump(abf1_reb1_params, f)

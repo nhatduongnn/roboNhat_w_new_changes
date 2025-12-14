@@ -595,7 +595,7 @@ def update_data_emission_matrix_using_fiber_seq_counts_Bionomial(
         strand = 'crick_signal'
 
     # Load parameters (now contains probabilities 'p')
-    with open('inputs/abf1_ace2_bas1_cad1_cbf1_reb1_params_w_pseudo.pkl', 'rb') as f:
+    with open('inputs/all_TFs_1000pealVal_params_pseudo.pkl', 'rb') as f:
         loaded_params = pickle.load(f)
 
     # Load parameters (now contains probabilities 'p')
@@ -611,15 +611,26 @@ def update_data_emission_matrix_using_fiber_seq_counts_Bionomial(
         'nucleosome_params': nucleosome_params,
         'loaded_params': loaded_params
     }
-    factors_to_plot = ['abf1', 'reb1', 'combined_low_count', 'background', 'nucleosome']
+
+    tf_name_trimmed = dshared['tfs']
+
+    # factors_to_plot = ['Abf1_murphy', 'Reb1_badis', 'combined_low_count', 'background', 'nucleosome']
     # plot_binding_factor(bg_params, nucleosome_params, loaded_params, factors_to_plot)
+
+    factors_to_plot = tf_name_trimmed
+    print('okay we plottinggg')
     plot_all_factors_side_by_side(bg_params, nucleosome_params, loaded_params, factors_to_plot)
+    print('Okay we finished plotting')
+
     ps = np.zeros(dshared['silent_states_begin'])
 
     # Default all TFs → combined low count parameters
     ps[:] = bg_params['p'][strand]['A']
 
-    tf_name_trimmed = [tf.split('_')[0].lower() for tf in dshared['tfs']]
+
+    # tf_name_trimmed = [tf.split('_')[0].lower() for tf in dshared['tfs']]
+    
+
     for i in range(dshared['n_tfs']):
         tf_start = tf_starts[i]
         tf_end = tf_start + 2 * tf_lens[i]
@@ -686,6 +697,7 @@ def plot_binding_factor(bg_params, nucleosome_params, loaded_params, factors):
         plt.legend()
         plt.tight_layout()
         plt.show()
+
 def plot_all_factors_side_by_side(bg_params, nucleosome_params, loaded_params, factors):
     plt.figure(figsize=(12, 5))
     current_x = 0
@@ -724,6 +736,7 @@ def plot_all_factors_side_by_side(bg_params, nucleosome_params, loaded_params, f
     plt.title("Watson (blue) and Crick (orange) p-values for binding factors")
     plt.tight_layout()
     plt.show()
+
 def update_data_emission_matrix_using_binomial_fiber_seq(
         d, segment, dshared, ps, data, data_trials, index, timepoint, strand):
     """

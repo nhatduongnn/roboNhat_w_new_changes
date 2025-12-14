@@ -1,3 +1,4 @@
+chr	start	end	strand	agree	TF	score	best_seq	peakVal
 chrIX	254319	254333	+	1	Abf1_murphy	8.3065	ATCACTCTGTACGG	1000
 chrIX	375256	375270	-	0	Abf1_murphy	8.4957	ATCATTTTAAACGA	1000
 chrIX	292347	292361	-	0	Abf1_murphy	8.651	GTCATTTCTAACGA	1000
