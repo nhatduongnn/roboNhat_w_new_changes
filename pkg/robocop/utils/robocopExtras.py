@@ -78,8 +78,8 @@ def updateMNaseEMMatGamma(args):
 def updateMNaseEMMatNB(args):
     (d, t, dshared, countParams, tech) = args
 
-    # robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(d, t, dshared, nuc_phi = countParams['nucLong']['phi'], nuc_mus = countParams['nucLong']['mu']*countParams['nucLong']['scale'], tf_phi = countParams['tfLong']['phi'], tf_mu = countParams['tfLong']['mu'], other_phi = countParams['otherLong']['phi'], other_mu = countParams['otherLong']['mu'], mnaseType = 'long', tech = tech)
-    # robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(d, t, dshared, nuc_phi = countParams['nucShort']['phi'], nuc_mus = countParams['nucShort']['mu']*countParams['nucShort']['scale'], tf_phi = countParams['tfShort']['phi'], tf_mu = countParams['tfShort']['mu'], other_phi = countParams['otherShort']['phi'], other_mu = countParams['otherShort']['mu'], mnaseType = 'short', tech = tech)
+    robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(d, t, dshared, nuc_phi = countParams['nucLong']['phi'], nuc_mus = countParams['nucLong']['mu']*countParams['nucLong']['scale'], tf_phi = countParams['tfLong']['phi'], tf_mu = countParams['tfLong']['mu'], other_phi = countParams['otherLong']['phi'], other_mu = countParams['otherLong']['mu'], mnaseType = 'long', tech = tech)
+    robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(d, t, dshared, nuc_phi = countParams['nucShort']['phi'], nuc_mus = countParams['nucShort']['mu']*countParams['nucShort']['scale'], tf_phi = countParams['tfShort']['phi'], tf_mu = countParams['tfShort']['mu'], other_phi = countParams['otherShort']['phi'], other_mu = countParams['otherShort']['mu'], mnaseType = 'short', tech = tech)
     # # robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(t, dshared, nuc_phi = countParams['nucLong']['phi'], nuc_mus = countParams['nucLong']['mu']*countParams['nucLong']['scale'], tf_phi = countParams['tfLong']['phi'], tf_mu = countParams['tfLong']['mu'], other_phi = countParams['otherLong']['phi'], other_mu = countParams['otherLong']['mu'], mnaseType = 'long', tech = tech)
     # robocop.update_data_emission_matrix_using_mnase_midpoint_counts_onePhi(t, dshared, nuc_phi = countParams['nucShort']['phi'], nuc_mus = countParams['nucShort']['mu']*countParams['nucShort']['scale'], tf_phi = countParams['tfShort']['phi'], tf_mu = countParams['tfShort']['mu'], other_phi = countParams['otherShort']['phi'], other_mu = countParams['otherShort']['mu'], mnaseType = 'short', tech = tech)
 #     robocop.update_data_emission_matrix_using_fiber_seq_counts_onePhi(d, t, dshared, nuc_phi = countParams['nucShort']['phi'], nuc_mus = countParams['nucShort']['mu']*countParams['nucShort']['scale'], tf_phi = countParams['tfShort']['phi'], tf_mu = countParams['tfShort']['mu'], other_phi = countParams['otherShort']['phi'], other_mu = countParams['otherShort']['mu'], FiberType = 'watson', tech = tech)
@@ -102,7 +102,8 @@ def updateMNaseEMMatNB(args):
 
     ## Turn all values of 0 into a small value
     epsilon = 1e-30
-    data_emission_matrix[data_emission_matrix == 0] = epsilon
+    data_emission_matrix[5][data_emission_matrix[5] == 0] = epsilon
+    data_emission_matrix[6][data_emission_matrix[6] == 0] = epsilon
 
     d['emission'] = data_emission_matrix
 

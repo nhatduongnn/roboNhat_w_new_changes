@@ -612,15 +612,18 @@ def update_data_emission_matrix_using_fiber_seq_counts_Bionomial(
         'loaded_params': loaded_params
     }
 
-    tf_name_trimmed = dshared['tfs']
+    tf_name_trimmed = list(loaded_params['p'].keys())
+    print(tf_name_trimmed)
 
     # factors_to_plot = ['Abf1_murphy', 'Reb1_badis', 'combined_low_count', 'background', 'nucleosome']
     # plot_binding_factor(bg_params, nucleosome_params, loaded_params, factors_to_plot)
 
     factors_to_plot = tf_name_trimmed
+    factors_to_plot += ['background', 'nucleosome']
     print('okay we plottinggg')
     plot_all_factors_side_by_side(bg_params, nucleosome_params, loaded_params, factors_to_plot)
     print('Okay we finished plotting')
+    # print(dshared['tfs'])
 
     ps = np.zeros(dshared['silent_states_begin'])
 
@@ -630,15 +633,32 @@ def update_data_emission_matrix_using_fiber_seq_counts_Bionomial(
 
     # tf_name_trimmed = [tf.split('_')[0].lower() for tf in dshared['tfs']]
     
+    all_tf_from_pwm = dshared['tfs']
 
     for i in range(dshared['n_tfs']):
         tf_start = tf_starts[i]
         tf_end = tf_start + 2 * tf_lens[i]
-        if tf_name_trimmed[i] in loaded_params['p']:
-            p_forward = loaded_params['p'][tf_name_trimmed[i]][strand]['A']
-            p_reverse = loaded_params['p'][tf_name_trimmed[i]][strand]['A'][::-1]
-            ps[tf_start:tf_end] = np.concatenate((p_forward,p_reverse))
+        tf_name = all_tf_from_pwm[i]
+
+        if tf_name in loaded_params['p']:
+            print(f"\n---- TF {i} ----")
+            print("dshare tfs is:", dshared['tfs'][i])
+            print("tf_name:", tf_name)
+            print("tf_start:", tf_start, "tf_end:", tf_end)
+            p_forward = loaded_params['p'][tf_name][strand]['A']
+            p_reverse = loaded_params['p'][tf_name][strand]['A'][::-1]
+            print("p_forward shape:", np.shape(p_forward))
+            print("p_reverse shape:", np.shape(p_reverse))
+            print("Concatenated shape:", len(np.concatenate((p_forward, p_reverse))))
+            print("ps slice length:", tf_end - tf_start)
+
+            # Optional: print a small preview instead of everything
+            print("p_forward[:5]:", p_forward[:5])
+            print("p_reverse[:5]:", p_reverse[:5])
+
+            ps[tf_start:tf_end] = np.concatenate((p_forward, p_reverse))
         else:
+            print(f"{tf_name} not in loaded_params['p'], using combined_low_count")
             ps[tf_start:tf_end] = loaded_params['p']['combined_low_count'][strand]['A']
 
     nuc_p_params = nucleosome_params['p'][strand]['A']

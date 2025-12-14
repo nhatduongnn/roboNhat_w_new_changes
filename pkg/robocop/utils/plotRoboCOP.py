@@ -156,8 +156,8 @@ def plotOutput(outDir, config, dbf_color_map, optable, chrm, start, end,
         isgtf = 0
 
     # MNase coverage plot
-    ax[1 + isgtf].plot(list(range(start - 1, end)), longCounts, color='maroon')
-    ax[1 + isgtf].plot(list(range(start - 1, end)), shortCounts, color='blue')
+    # ax[1 + isgtf].plot(list(range(start - 1, end)), longCounts, color='maroon')
+    # ax[1 + isgtf].plot(list(range(start - 1, end)), shortCounts, color='blue')
 
     bamFile = config.get("main", "bamFile")
     shortCounts, longCounts = plotMidpointsAx(
